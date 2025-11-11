@@ -22,6 +22,15 @@ function parseJsonl(raw) {
     .map((line) => JSON.parse(line));
 }
 
+/** Utility: Normalize BDI field to always be an array of {type,text} */
+function normalizeBDI(bdi) {
+  if (!bdi) return [];
+  if (Array.isArray(bdi)) return bdi;
+  if (typeof bdi === "object")
+    return Object.entries(bdi).map(([type, text]) => ({ type, text }));
+  return [];
+}
+
 export default function App() {
   const conversations = useMemo(() => parseJsonl(rawData), [rawData]);
   const total = conversations.length || 0;
@@ -91,8 +100,11 @@ export default function App() {
         attack_mapping_ratings: [],
       };
 
+      // Normalize and handle both object or array BDI
+      const normalizedBDI = normalizeBDI(turn.bdi);
+
       // BDI ratings
-      for (const bdiItem of turn.bdi ?? []) {
+      for (const bdiItem of normalizedBDI) {
         const key = makeKey(turn.turn_id, "bdi", bdiItem.text);
         const chosen = getRating(key) ?? "Neutral";
         turnObj.bdi_ratings[bdiItem.text] = {
@@ -185,12 +197,8 @@ export default function App() {
         </div>
 
         <div className="nav-buttons">
-          <button onClick={() => setIdx((i) => Math.max(0, i - 1))}>
-            ⬅️ Prev
-          </button>
-          <button onClick={() => setIdx((i) => Math.min(total - 1, i + 1))}>
-            Next ➡️
-          </button>
+          <button onClick={() => setIdx((i) => Math.max(0, i - 1))}>⬅️ Prev</button>
+          <button onClick={() => setIdx((i) => Math.min(total - 1, i + 1))}>Next ➡️</button>
         </div>
       </div>
 
@@ -211,56 +219,54 @@ export default function App() {
       </div>
 
       {/* Turns */}
-      {conv.turns.map((turn) => (
-        <div
-          key={turn.turn_id}
-          className={`card ${
-            turn.role.toLowerCase() === "human" ? "human-card" : "assistant-card"
-          }`}
-        >
-          <div className="turn-header">
-            <strong>
-              {turn.role.toLowerCase() === "human"
-                ? "👤 Human"
-                : "🤖 Assistant"}{" "}
-              (Turn {turn.turn_id})
-            </strong>
-          </div>
+      {conv.turns.map((turn) => {
+        const normalizedBDI = normalizeBDI(turn.bdi);
+        return (
+          <div
+            key={turn.turn_id}
+            className={`card ${
+              turn.role.toLowerCase() === "human"
+                ? "human-card"
+                : "assistant-card"
+            }`}
+          >
+            <div className="turn-header">
+              <strong>
+                {turn.role.toLowerCase() === "human" ? "👤 Human" : "🤖 Assistant"} (Turn {turn.turn_id})
+              </strong>
+            </div>
 
-          <div className="turn-text">{turn.text}</div>
+            <div className="turn-text">{turn.text}</div>
 
-          {/* BDI ratings */}
-          {["belief", "desire", "intention"].map((tp) => {
-            const items = (turn.bdi ?? []).filter((b) => b.type === tp);
-            if (items.length === 0) return null;
-            const label = tp.charAt(0).toUpperCase() + tp.slice(1) + "s";
-            return (
-              <div key={tp} className="bdi-group spaced">
-                <div className="bdi-label underlined">{label}</div>
-                {items.map((item) => {
-                  const key = makeKey(turn.turn_id, "bdi", item.text);
-                  return (
-                    <div key={item.text} className="spaced-item">
-                      <div className="bdi-text">{item.text}</div>
-                      <RatingGroup
-                        options={RATING_OPTIONS}
-                        selected={getRating(key)}
-                        onSelect={(opt) => setRating(key, opt)}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-
-          {/* Attack mappings (for human turns, skip first) */}
-          {turn.role === "Human" &&
-            (turn.attack_mappings?.length || 0) > 0 && (
-              <div className="attack-group spaced">
-                <div className="bdi-label underlined">
-                  Attack Mapping Ratings
+            {/* BDI ratings */}
+            {["belief", "desire", "intention"].map((tp) => {
+              const items = normalizedBDI.filter((b) => b.type === tp);
+              if (items.length === 0) return null;
+              const label = tp.charAt(0).toUpperCase() + tp.slice(1) + "s";
+              return (
+                <div key={tp} className="bdi-group spaced">
+                  <div className="bdi-label underlined">{label}</div>
+                  {items.map((item) => {
+                    const key = makeKey(turn.turn_id, "bdi", item.text);
+                    return (
+                      <div key={item.text} className="spaced-item">
+                        <div className="bdi-text">{item.text}</div>
+                        <RatingGroup
+                          options={RATING_OPTIONS}
+                          selected={getRating(key)}
+                          onSelect={(opt) => setRating(key, opt)}
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
+              );
+            })}
+
+            {/* Attack mappings (for human turns, skip first) */}
+            {turn.role === "Human" && (turn.attack_mappings?.length || 0) > 0 && (
+              <div className="attack-group spaced">
+                <div className="bdi-label underlined">Attack Mapping Ratings</div>
                 {turn.attack_mappings.map((atk, i) => {
                   const keyBase = makeKey(turn.turn_id, "attack", i);
                   return (
@@ -305,8 +311,9 @@ export default function App() {
                 })}
               </div>
             )}
-        </div>
-      ))}
+          </div>
+        );
+      })}
 
       {/* Submit */}
       <div className="submit-section">
@@ -317,8 +324,7 @@ export default function App() {
           💾 Submit (Stay)
         </button>
         <div className="submit-note">
-          Annotations auto-save locally. Ratings reset when switching
-          conversations.
+          Annotations auto-save locally. Ratings reset when switching conversations.
         </div>
       </div>
 
@@ -327,9 +333,7 @@ export default function App() {
       {/* Download & Clear */}
       <div className="bottom-bar">
         <button onClick={downloadJsonl}>📥 Download annotations.jsonl</button>
-        <button className="danger" onClick={clearLocalAnnotations}>
-          🗑️ Clear Saved
-        </button>
+        <button className="danger" onClick={clearLocalAnnotations}>🗑️ Clear Saved</button>
         <div className="annotation-count">
           Saved annotations: <strong>{annotations.length}</strong>
         </div>
