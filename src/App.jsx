@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { saveAs } from "file-saver";
-import rawData from "./data/100_sampled_bdi_review.jsonl?raw";
+import rawData from "./data/review_100_conversations_with_mappings.jsonl?raw";
 import "./App.css";
 
 const RATING_OPTIONS = [
@@ -11,7 +11,7 @@ const RATING_OPTIONS = [
   "Strongly Agree",
 ];
 
-const STORAGE_KEY = "bdi_annotations_v1";
+const STORAGE_KEY = "bdi_annotations_v2";
 
 function parseJsonl(raw) {
   if (!raw) return [];
@@ -62,38 +62,64 @@ export default function App() {
 
   const conv = conversations[idx];
 
-  function setRating(turnId, itemText, rating) {
-    const key = `${turnId}|||${itemText}`;
+  function makeKey(...parts) {
+    return parts.join("|||");
+  }
+
+  function setRating(key, rating) {
     setLocalRatings((prev) => ({ ...prev, [key]: rating }));
   }
 
-  // Build annotation object with optimized structure:
-  // turn_annotations[].bdi_ratings = { "<text>": { rating: "...", type: "belief" } }
+  function getRating(key) {
+    return localRatings[key] ?? null;
+  }
+
+  /** Build structured JSON for current conversation */
   function buildAnnotationObjectForCurrentConv() {
     const annotation = {
       conversation_id: conv.conversation_id,
       stratum: conv.stratum ?? "Unknown",
+      stratum_rating: getRating(makeKey("stratum")),
       turn_annotations: [],
     };
 
     for (const turn of conv.turns) {
-      const t = {
+      const turnObj = {
         turn_id: turn.turn_id,
         role: turn.role,
         bdi_ratings: {},
+        attack_mapping_ratings: [],
       };
 
-      for (const item of turn.bdi ?? []) {
-        const key = `${turn.turn_id}|||${item.text}`;
-        const chosen = localRatings[key] ?? "Neutral";
-        // NOTE: we do NOT include `text` inside the object because the key IS the text
-        t.bdi_ratings[item.text] = {
+      // BDI ratings
+      for (const bdiItem of turn.bdi ?? []) {
+        const key = makeKey(turn.turn_id, "bdi", bdiItem.text);
+        const chosen = getRating(key) ?? "Neutral";
+        turnObj.bdi_ratings[bdiItem.text] = {
           rating: chosen,
-          type: item.type,
+          type: bdiItem.type,
         };
       }
 
-      annotation.turn_annotations.push(t);
+      // Attack mapping ratings (only for human turns, not first)
+      if (turn.role === "Human" && (turn.attack_mappings?.length || 0) > 0) {
+        for (const [i, atk] of turn.attack_mappings.entries()) {
+          const keyBase = makeKey(turn.turn_id, "attack", i);
+          const targetTypeRating =
+            getRating(makeKey(keyBase, "target_type")) ?? "Neutral";
+          const strategyRating =
+            getRating(makeKey(keyBase, "strategy")) ?? "Neutral";
+          turnObj.attack_mapping_ratings.push({
+            target_bdi_type: atk.target_bdi_type,
+            attack_strategy: atk.attack_strategy,
+            target_type_rating: targetTypeRating,
+            strategy_rating: strategyRating,
+            explanation: atk.explanation,
+          });
+        }
+      }
+
+      annotation.turn_annotations.push(turnObj);
     }
 
     return annotation;
@@ -123,16 +149,28 @@ export default function App() {
     }
   }
 
-  function getSelectedRating(turnId, itemText) {
-    const key = `${turnId}|||${itemText}`;
-    return localRatings[key] ?? null;
+  /** Rating button group */
+  function RatingGroup({ options, selected, onSelect }) {
+    return (
+      <div className="rating-group">
+        {options.map((opt) => (
+          <button
+            key={opt}
+            className={`rating-btn ${selected === opt ? "selected" : ""}`}
+            onClick={() => onSelect(opt)}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
+    );
   }
 
   return (
     <div className="app-container">
-      <h1>🎯 BDI Annotation Tool</h1>
+      <h1>🎯 BDI & Attack Mapping Annotation Tool</h1>
 
-      {/* Top bar: index, stratum, conversation id */}
+      {/* Top bar */}
       <div className="top-bar">
         <div>
           <div className="conv-meta">
@@ -141,91 +179,160 @@ export default function App() {
             </strong>
             <span className="stratum"> {conv.stratum ?? "Unknown"}</span>
           </div>
-          <div className="conv-id">ID: <code>{conv.conversation_id}</code></div>
+          <div className="conv-id">
+            ID: <code>{conv.conversation_id}</code>
+          </div>
         </div>
 
         <div className="nav-buttons">
-          <button onClick={() => setIdx((i) => Math.max(0, i - 1))}>⬅️ Prev</button>
-          <button onClick={() => setIdx((i) => Math.min(total - 1, i + 1))}>Next ➡️</button>
+          <button onClick={() => setIdx((i) => Math.max(0, i - 1))}>
+            ⬅️ Prev
+          </button>
+          <button onClick={() => setIdx((i) => Math.min(total - 1, i + 1))}>
+            Next ➡️
+          </button>
         </div>
       </div>
 
       <hr />
 
+      {/* Stratum rating */}
+      <div className="card">
+        <div className="bdi-label underlined">Stratum Rating</div>
+        <div className="bdi-text">
+          Is the assigned stratum <strong>{conv.stratum}</strong> correct for
+          this conversation?
+        </div>
+        <RatingGroup
+          options={RATING_OPTIONS}
+          selected={getRating(makeKey("stratum"))}
+          onSelect={(opt) => setRating(makeKey("stratum"), opt)}
+        />
+      </div>
+
       {/* Turns */}
       {conv.turns.map((turn) => (
         <div
           key={turn.turn_id}
-          className={`card ${turn.role.toLowerCase() === "human" ? "human-card" : "assistant-card"}`}
+          className={`card ${
+            turn.role.toLowerCase() === "human" ? "human-card" : "assistant-card"
+          }`}
         >
           <div className="turn-header">
             <strong>
-              {turn.role.toLowerCase() === "human" ? "👤 Human" : "🤖 Assistant"} (Turn {turn.turn_id})
+              {turn.role.toLowerCase() === "human"
+                ? "👤 Human"
+                : "🤖 Assistant"}{" "}
+              (Turn {turn.turn_id})
             </strong>
           </div>
 
           <div className="turn-text">{turn.text}</div>
 
-          {/* BDI groups with spacing: label (underlined), item, buttons */}
+          {/* BDI ratings */}
           {["belief", "desire", "intention"].map((tp) => {
             const items = (turn.bdi ?? []).filter((b) => b.type === tp);
             if (items.length === 0) return null;
-
-            // Capitalize label
             const label = tp.charAt(0).toUpperCase() + tp.slice(1) + "s";
-
             return (
               <div key={tp} className="bdi-group spaced">
                 <div className="bdi-label underlined">{label}</div>
-
-                {items.map((item) => (
-                  <div key={item.text} className="bdi-item spaced-item">
-                    <div className="bdi-text">{item.text}</div>
-                    <div className="rating-group">
-                      {RATING_OPTIONS.map((opt) => {
-                        const selected = getSelectedRating(turn.turn_id, item.text) === opt;
-                        return (
-                          <button
-                            key={opt}
-                            className={`rating-btn ${selected ? "selected" : ""}`}
-                            onClick={() => setRating(turn.turn_id, item.text, opt)}
-                          >
-                            {opt}
-                          </button>
-                        );
-                      })}
+                {items.map((item) => {
+                  const key = makeKey(turn.turn_id, "bdi", item.text);
+                  return (
+                    <div key={item.text} className="spaced-item">
+                      <div className="bdi-text">{item.text}</div>
+                      <RatingGroup
+                        options={RATING_OPTIONS}
+                        selected={getRating(key)}
+                        onSelect={(opt) => setRating(key, opt)}
+                      />
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             );
           })}
+
+          {/* Attack mappings (for human turns, skip first) */}
+          {turn.role === "Human" &&
+            (turn.attack_mappings?.length || 0) > 0 && (
+              <div className="attack-group spaced">
+                <div className="bdi-label underlined">
+                  Attack Mapping Ratings
+                </div>
+                {turn.attack_mappings.map((atk, i) => {
+                  const keyBase = makeKey(turn.turn_id, "attack", i);
+                  return (
+                    <div key={i} className="attack-item spaced-item">
+                      <div className="bdi-text">
+                        <strong>Target BDI Type:</strong>{" "}
+                        <code>{atk.target_bdi_type}</code> <br />
+                        <strong>Attack Strategy:</strong>{" "}
+                        <code>{atk.attack_strategy}</code>
+                        <br />
+                        <em>{atk.explanation}</em>
+                      </div>
+
+                      <div className="attack-rating-pair">
+                        <div>
+                          <div className="mini-label">
+                            Target BDI Type correctness
+                          </div>
+                          <RatingGroup
+                            options={RATING_OPTIONS}
+                            selected={getRating(makeKey(keyBase, "target_type"))}
+                            onSelect={(opt) =>
+                              setRating(makeKey(keyBase, "target_type"), opt)
+                            }
+                          />
+                        </div>
+                        <div>
+                          <div className="mini-label">
+                            Attack Strategy correctness
+                          </div>
+                          <RatingGroup
+                            options={RATING_OPTIONS}
+                            selected={getRating(makeKey(keyBase, "strategy"))}
+                            onSelect={(opt) =>
+                              setRating(makeKey(keyBase, "strategy"), opt)
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
         </div>
       ))}
 
       {/* Submit */}
       <div className="submit-section">
         <button className="primary" onClick={() => handleSubmitConversation(true)}>
-          💾 Submit This Conversation & Next
+          💾 Submit & Next
         </button>
-
         <button onClick={() => handleSubmitConversation(false)}>
-          💾 Submit This Conversation (stay)
+          💾 Submit (Stay)
         </button>
-
         <div className="submit-note">
-          Submitted annotations are auto-saved locally. Draft selections reset when switching conversations.
+          Annotations auto-save locally. Ratings reset when switching
+          conversations.
         </div>
       </div>
 
       <hr />
 
-      {/* Download + Clear */}
+      {/* Download & Clear */}
       <div className="bottom-bar">
         <button onClick={downloadJsonl}>📥 Download annotations.jsonl</button>
-        <button className="danger" onClick={clearLocalAnnotations}>🗑️ Clear Saved Annotations</button>
-
-        <div className="annotation-count">Saved annotations: <strong>{annotations.length}</strong></div>
+        <button className="danger" onClick={clearLocalAnnotations}>
+          🗑️ Clear Saved
+        </button>
+        <div className="annotation-count">
+          Saved annotations: <strong>{annotations.length}</strong>
+        </div>
       </div>
 
       <hr />

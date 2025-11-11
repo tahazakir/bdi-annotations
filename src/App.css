@@ -133,3 +133,7 @@
 /* small tweaks */
 hr { border-top: 1px solid #23292f; margin: 18px 0; }
 pre { background: #0b1114; color: #dbeafe; padding: 12px; border-radius: 8px; border: 1px solid #1b2328; }
+
+.attack-group { margin-top: 10px; }
+.attack-rating-pair { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
+.mini-label { font-size: 12px; color: #9fb4d8; margin-bottom: 4px; }
