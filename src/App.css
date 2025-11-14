@@ -1,6 +1,6 @@
 /* ===== GLOBAL DARK MODE ENFORCEMENT ===== */
 html, body {
-  background: #0d1117;        /* solid dark background */
+  background: #161b22;        /* dark grey background */
   color: #e6edf3;             /* default light text */
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   margin: 0;
