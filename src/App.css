@@ -1,10 +1,26 @@
+/* ===== GLOBAL DARK MODE ENFORCEMENT ===== */
+html, body {
+  background: #0d1117;        /* solid dark background */
+  color: #e6edf3;             /* default light text */
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: #79c0ff;
+}
+
 /* ===== App layout classes (used by the refined App.jsx) ===== */
 
 .app-container {
   max-width: 980px;
   margin: 24px auto;
   padding: 16px;
-  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
 /* Top bar */
@@ -19,6 +35,7 @@
   color: #e6edf3;
   font-size: 15px;
 }
+
 .stratum {
   color: #9fb4d8;
   margin-left: 8px;
@@ -31,6 +48,7 @@
   color: #9aa7b2;
   font-size: 12px;
 }
+
 .conv-id code {
   background: #0b1116;
   padding: 4px 6px;
@@ -49,12 +67,12 @@
   margin-bottom: 18px;
 }
 
-/* optional subtle tint */
-.human-card { background: #0f1519; }
+.human-card  { background: #0f1519; }
 .assistant-card { background: #0f1614; }
 
 /* Turn text */
 .turn-header { margin-bottom: 8px; }
+
 .turn-text {
   margin-bottom: 12px;
   color: #e6edf3;
@@ -62,36 +80,37 @@
   white-space: pre-wrap;
 }
 
-/* BDI group label (underlined) */
+/* BDI */
 .bdi-group { margin-top: 8px; margin-bottom: 8px; }
+
 .bdi-label {
   font-weight: 700;
   font-size: 13px;
   color: #cfe8ff;
   margin-bottom: 8px;
 }
+
 .bdi-label.underlined {
   text-decoration: underline;
   text-decoration-color: rgba(95,160,255,0.25);
   text-underline-offset: 4px;
 }
 
-/* Spacing: separate label from item and item from buttons */
 .spaced .bdi-item { margin-top: 8px; margin-bottom: 10px; }
+
 .spaced-item .bdi-text {
   margin-bottom: 8px;
   color: #dbeafe;
   font-size: 14px;
 }
 
-/* rating group */
+/* Rating */
 .rating-group {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
 }
 
-/* rating button visual (re-use earlier classes) */
 .rating-btn {
   padding: 6px 10px;
   border-radius: 9999px;
@@ -100,7 +119,12 @@
   color: #cfe8ff;
   font-size: 13px;
 }
-.rating-btn:hover { background: #1a2328; border-color: #58a6ff; }
+
+.rating-btn:hover {
+  background: #1a2328;
+  border-color: #58a6ff;
+}
+
 .rating-btn.selected {
   background: rgba(47,128,237,0.12);
   border-color: #58a6ff;
@@ -108,14 +132,19 @@
   font-weight: 700;
 }
 
-/* Submit area */
+/* Submit section */
 .submit-section {
   display: flex;
   gap: 12px;
   margin-top: 12px;
   align-items: center;
 }
-.submit-note { margin-left: 16px; color: #9aa7b2; font-size: 13px; }
+
+.submit-note {
+  margin-left: 16px;
+  color: #9aa7b2;
+  font-size: 13px;
+}
 
 /* bottom bar */
 .bottom-bar {
@@ -123,17 +152,42 @@
   gap: 10px;
   align-items: center;
 }
-.annotation-count { margin-left: auto; color: #9aa7b2; }
+
+.annotation-count {
+  margin-left: auto;
+  color: #9aa7b2;
+}
 
 /* preview */
 .preview-section { margin-top: 12px; }
 .preview-label { font-size: 13px; color: #9aa7b2; margin-bottom: 8px; }
 .no-submission { color: #9aa7b2; }
 
-/* small tweaks */
-hr { border-top: 1px solid #23292f; margin: 18px 0; }
-pre { background: #0b1114; color: #dbeafe; padding: 12px; border-radius: 8px; border: 1px solid #1b2328; }
+/* misc */
+hr {
+  border-top: 1px solid #23292f;
+  margin: 18px 0;
+}
+
+pre {
+  background: #0b1114;
+  color: #dbeafe;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #1b2328;
+}
 
 .attack-group { margin-top: 10px; }
-.attack-rating-pair { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
-.mini-label { font-size: 12px; color: #9fb4d8; margin-bottom: 4px; }
+
+.attack-rating-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.mini-label {
+  font-size: 12px;
+  color: #9fb4d8;
+  margin-bottom: 4px;
+}
